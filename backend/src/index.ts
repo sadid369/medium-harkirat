@@ -2,10 +2,31 @@ import { Hono } from "hono";
 import { PrismaClient } from "@prisma/client/edge";
 import { withAccelerate } from "@prisma/extension-accelerate";
 import { decode, sign, verify } from "hono/jwt";
-
+// update gitignore
 const app = new Hono<{
   Bindings: { DATABASE_URL: string; JWT_SECRET: string };
+  Variables: { userId: any };
 }>();
+app.use("/api/v1/blog/*", async (c, next) => {
+  const token = c.req.header("Authorization")?.split(" ")[1];
+  if (!token) {
+    c.status(403);
+    return c.json({ error: "Missing token" });
+  }
+  if (token) {
+    try {
+      const payload = await verify(token, c.env.JWT_SECRET);
+      if (payload) {
+        c.set("userId", payload.id);
+        await next();
+      }
+    } catch (e) {
+      c.status(403);
+      return c.json({ error: "Invalid token" });
+    }
+  }
+});
+
 app.post("/api/v1/signup", async (c) => {
   const prisma = new PrismaClient({
     datasourceUrl: c.env.DATABASE_URL,
@@ -65,9 +86,6 @@ app.post("/api/v1/signin", async (c) => {
     c.env.JWT_SECRET
   );
   return c.json(user, { headers: { Authorization: `Bearer ${token}` } });
-});
-app.post("/api/v1/blog", (c) => {
-  return c.text("Hello Hono!");
 });
 app.put("/api/v1/blog", (c) => {
   return c.text("Hello Hono!");
