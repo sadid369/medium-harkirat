@@ -88,10 +88,10 @@ app.post("/api/v1/signin", async (c) => {
   return c.json(user, { headers: { Authorization: `Bearer ${token}` } });
 });
 app.put("/api/v1/blog", (c) => {
-  return c.text("Hello Hono!");
+  return c.text(c.get("userId"));
 });
 app.get("/api/v1/blog", async (c) => {
-  return c.text("Hello Hono!");
+  return c.text(c.get("userId"));
 });
 app.get("/api/v1/blog/:id", (c) => {
   return c.text("Hello Hono!");
