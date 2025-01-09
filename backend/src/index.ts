@@ -2,99 +2,15 @@ import { Hono } from "hono";
 import { PrismaClient } from "@prisma/client/edge";
 import { withAccelerate } from "@prisma/extension-accelerate";
 import { decode, sign, verify } from "hono/jwt";
+import { userRouter } from "./routes/user";
+import { blogRouter } from "./routes/blog";
 // update gitignore
 const app = new Hono<{
   Bindings: { DATABASE_URL: string; JWT_SECRET: string };
   Variables: { userId: any };
 }>();
-app.use("/api/v1/blog/*", async (c, next) => {
-  const token = c.req.header("Authorization")?.split(" ")[1];
-  if (!token) {
-    c.status(403);
-    return c.json({ error: "Missing token" });
-  }
-  if (token) {
-    try {
-      const payload = await verify(token, c.env.JWT_SECRET);
-      if (payload) {
-        c.set("userId", payload.id);
-        await next();
-      }
-    } catch (e) {
-      c.status(403);
-      return c.json({ error: "Invalid token" });
-    }
-  }
-});
 
-app.post("/api/v1/signup", async (c) => {
-  const prisma = new PrismaClient({
-    datasourceUrl: c.env.DATABASE_URL,
-  }).$extends(withAccelerate());
-  const body = await c.req.json();
-  const { email, name, password } = body;
-  if (!email || !name || !password) {
-    c.status(403);
-    return c.json({ error: "Missing required fields" });
-  }
-  const existingUser = await prisma.user.findUnique({
-    where: {
-      email,
-    },
-  });
-  if (existingUser) {
-    c.status(403);
-    return c.json({ error: "User already exists" });
-  }
-  const user = await prisma.user.create({
-    data: { email, name, password },
-  });
-  const token = await sign(
-    {
-      id: user.id,
-    },
-    c.env.JWT_SECRET
-  );
-  // return c.json(user, { headers: { Authorization: `Bearer ${token}` } });
-  return c.json({ user, token });
-});
-app.post("/api/v1/signin", async (c) => {
-  const prisma = new PrismaClient({
-    datasourceUrl: c.env.DATABASE_URL,
-  }).$extends(withAccelerate());
-  const body = await c.req.json();
-
-  const { email, password } = body;
-  console.log(email, password);
-  if (!email || !password) {
-    c.status(403);
-    return c.json({ error: "Missing required fields" });
-  }
-  const user = await prisma.user.findUnique({
-    where: {
-      email,
-    },
-  });
-  if (!user || user.password !== password) {
-    c.status(403);
-    return c.json({ error: "Invalid credentials" });
-  }
-  const token = await sign(
-    {
-      id: user.id,
-    },
-    c.env.JWT_SECRET
-  );
-  return c.json(user, { headers: { Authorization: `Bearer ${token}` } });
-});
-app.put("/api/v1/blog", (c) => {
-  return c.text(c.get("userId"));
-});
-app.get("/api/v1/blog", async (c) => {
-  return c.text(c.get("userId"));
-});
-app.get("/api/v1/blog/:id", (c) => {
-  return c.text("Hello Hono!");
-});
+app.route("/api/v1/blog", blogRouter);
+app.route("/api/v1/user", userRouter);
 
 export default app;
