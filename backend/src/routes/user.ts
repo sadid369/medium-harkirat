@@ -2,18 +2,26 @@ import { Hono } from "hono";
 import { PrismaClient } from "@prisma/client/edge";
 import { withAccelerate } from "@prisma/extension-accelerate";
 import { decode, sign, verify } from "hono/jwt";
+import z from "zod";
+import { SignupInput, SigninInput } from "@sadiddev/common";
 export const userRouter = new Hono<{
   Bindings: { DATABASE_URL: string; JWT_SECRET: string };
   Variables: { userId: any };
 }>();
+
 userRouter.post("/signup", async (c) => {
   const prisma = new PrismaClient({
     datasourceUrl: c.env.DATABASE_URL,
   }).$extends(withAccelerate());
   const body = await c.req.json();
+  const { success } = SignupInput.safeParse(body);
+  if (!success) {
+    c.status(403);
+    return c.json({ error: "Invalid request body" });
+  }
   const { email, name, password } = body;
   if (!email || !name || !password) {
-    c.status(403);
+    c.status(411);
     return c.json({ error: "Missing required fields" });
   }
   try {
@@ -46,7 +54,11 @@ userRouter.post("/signin", async (c) => {
     datasourceUrl: c.env.DATABASE_URL,
   }).$extends(withAccelerate());
   const body = await c.req.json();
-
+  const { success } = SigninInput.safeParse(body);
+  if (!success) {
+    c.status(411);
+    return c.json({ error: "Invalid request body" });
+  }
   const { email, password } = body;
 
   if (!email || !password) {
@@ -70,7 +82,7 @@ userRouter.post("/signin", async (c) => {
       },
       c.env.JWT_SECRET
     );
-    return c.json(user, { headers: { Authorization: `Bearer ${token}` } });
+    return c.json({ user, token });
   } catch (error) {
     return c.json({ error });
   }
